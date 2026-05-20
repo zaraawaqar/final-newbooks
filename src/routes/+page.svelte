@@ -7,6 +7,7 @@ let { data } = $props();
 
 // Wrap the array in $state so the totals below can react to it.
 let transactions = $state(data.transactions);
+let currentFilter = $state('all');
 
   // Add this INSIDE the <script> block, below the transactions array.
 function classify(t) {
@@ -22,11 +23,19 @@ function classify(t) {
 // Add these THREE derived totals to your <script> block,
 // below the classify() function.
 
-let totalRevenue = $derived(
+let consultingRevenue = $derived(
   transactions
-    .filter(t => classify(t) === 'Revenue')
+    .filter(t => classify(t) === 'Revenue' && (t.credit === 'Consulting' || t.description?.toLowerCase().includes('consulting')))
     .reduce((sum, t) => sum + Number(t.amount), 0)
 );
+
+let salesRevenue = $derived(
+  transactions
+    .filter(t => classify(t) === 'Revenue' && (t.credit === 'Sales' || t.description?.toLowerCase().includes('sales')))
+    .reduce((sum, t) => sum + Number(t.amount), 0)
+);
+
+let totalRevenue = $derived(consultingRevenue + salesRevenue);
 
 let totalExpenses = $derived(
   transactions
@@ -44,12 +53,30 @@ let netIncome = $derived(totalRevenue - totalExpenses);
     <h1 class="text-3xl font-bold text-slate-800">📒 Final New Books</h1>
     <p class="text-slate-500 text-sm mt-1">Track transactions. See your income statement live.</p>
   </header>
-
+<div class="flex gap-2 mb-4">
+    <button 
+      class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 font-medium text-sm"
+      onclick={() => currentFilter = 'all'}>
+      Show All
+    </button>
+    
+    <button 
+      class="px-4 py-2 rounded bg-green-200 hover:bg-green-300 font-medium text-sm"
+      onclick={() => currentFilter = 'income'}>
+      Income Only
+    </button>
+    
+    <button 
+      class="px-4 py-2 rounded bg-red-200 hover:bg-red-300 font-medium text-sm"
+      onclick={() => currentFilter = 'expense'}>
+      Expenses Only
+    </button>
+  </div>
   <!-- NEW TRANSACTION FORM -->
   <section class="bg-white border border-slate-200 rounded-lg p-6 shadow-sm">
     <h2 class="text-xl font-bold text-slate-800 mb-4">New Transaction</h2>
 
-    <form method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<form method="POST" action="?/create" class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div>
         <label for="date" class="block text-sm font-medium text-slate-700 mb-1">Date</label>
         <input id="date" name="date" type="date" required
@@ -108,10 +135,20 @@ let netIncome = $derived(totalRevenue - totalExpenses);
     <h2 class="text-xl font-bold text-slate-800 mb-4">Income Statement</h2>
 
     <div class="space-y-2">
-  <div class="flex justify-between text-emerald-700 font-medium">
-    <span>Total Revenue</span>
-    <span>${totalRevenue.toFixed(2)}</span>
+ <div class="text-sm text-slate-600 pl-2 space-y-1 mb-2">
+  <div class="flex justify-between">
+    <span>• Consulting Revenue</span>
+    <span class="font-medium text-slate-800">${consultingRevenue.toFixed(2)}</span>
   </div>
+  <div class="flex justify-between pb-1">
+    <span>• Sales Revenue</span>
+    <span class="font-medium text-slate-800">${salesRevenue.toFixed(2)}</span>
+  </div>
+</div>
+<div class="flex justify-between text-emerald-700 font-bold border-t border-slate-100 pt-1">
+  <span>Total Revenue</span>
+  <span>${totalRevenue.toFixed(2)}</span>
+</div>
   <div class="flex justify-between text-rose-700 font-medium">
     <span>Total Expenses</span>
     <span>${totalExpenses.toFixed(2)}</span>
@@ -142,14 +179,24 @@ let netIncome = $derived(totalRevenue - totalExpenses);
           </tr>
         </thead>
 <tbody>
-  {#each transactions as t (t.id)}
+{#each transactions.filter(t => {
+  if (currentFilter === 'all') return true;
+  if (currentFilter === 'income') return t.credit === 'Cash' || classify(t) === 'Revenue';
+  if (currentFilter === 'expense') return t.debit === 'Cash' || classify(t) === 'Expense';
+}) as t (t.id)}
     <tr class="border-t border-slate-200 hover:bg-slate-50">
       <td class="px-3 py-2">{t.date}</td>
       <td class="px-3 py-2">{t.description}</td>
       <td class="px-3 py-2">{t.debit}</td>
       <td class="px-3 py-2">{t.credit}</td>
       <td class="px-3 py-2 text-right">${Number(t.amount).toFixed(2)}</td>
-      <td class="px-3 py-2">
+<td class="px-3 py-2 text-right">
+            <form method="POST" action="?/delete">
+              <input type="hidden" name="id" value={t.id} />
+              <button class="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded font-medium">
+                Delete
+              </button>
+            </form>
   {#if classify(t) === 'Revenue'}
     <span class="text-emerald-700 font-medium">Revenue</span>
   {:else if classify(t) === 'Expense'}

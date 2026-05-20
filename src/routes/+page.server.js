@@ -18,9 +18,10 @@ export async function load() {
 }
 
 // Form actions run when a form on the page is submitted via POST.
+// Form actions run when a form on the page is submitted via POST.
 export const actions = {
-  default: async ({ request }) => {
-    // 1. Get the form data the browser sent.
+  // Handles recording a new transaction
+  create: async ({ request }) => {
     const formData = await request.formData();
     const date        = formData.get('date');
     const description = formData.get('description');
@@ -28,13 +29,24 @@ export const actions = {
     const credit      = formData.get('credit');
     const amount      = formData.get('amount');
 
-    // 2. Write an INSERT that adds one row to the transactions table.
     await sql`
       INSERT INTO transactions (date, description, debit, credit, amount)
       VALUES (${date}, ${description}, ${debit}, ${credit}, ${amount})
     `;
 
-    // 3. Return success. SvelteKit will re-run load() automatically.
+    return { success: true };
+  },
+
+  // Handles deleting an existing transaction
+  delete: async ({ request }) => {
+    const formData = await request.formData();
+    const id = formData.get('id');
+
+    await sql`
+      DELETE FROM transactions 
+      WHERE id = ${id}
+    `;
+
     return { success: true };
   }
 };
